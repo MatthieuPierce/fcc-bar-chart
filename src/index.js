@@ -1,4 +1,9 @@
 import * as d3 from 'd3';
+import { examplo } from './examplo';
+import './index.scss';
+
+console.log("run from index.js");
+console.log(examplo);
 
 function component(){
   const element = document.createElement('div');
