@@ -1,1 +1,0 @@
-export const examplo = "examplo string"; 
