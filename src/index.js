@@ -1,5 +1,7 @@
 import * as d3 from 'd3';
 import './index.scss';
+import {quarterFormat, yTickText, gdpText } from './formats'
+import { datasetParse } from './datasetParse';
 
 //function to create main chart div with plain JS (not D3)
 // no good reason for this, just practice making html in plain js
@@ -12,11 +14,6 @@ function makeDivForChart(){
 //append chart-div to the "main" element
 document.getElementById("main").appendChild(makeDivForChart());
 
-
-
-// Date formater for display in tooltip per test criteria
-//I.e. "YYYY QX", 2020 Q4
-let quarterFormat = d3.timeFormat("%Y Q%q");
 
 //INITIAL CHART PARAMETERS
 
@@ -54,16 +51,15 @@ const innerGroup = mainSvg.append("g")
   .attr("id", "inner-group")
   ;
 
-// y-axis tick text format logic
-//format tick text to local (US) currency with two significant digits
-// and remove any trailing .0
-let yTickText = (tick) => d3.format("$.2s")(tick).replace('.0', '')
+// HELPER FUNCTIONS
+
+// simple clamp function
+let clamp = (min, val, max) => Math.max(min, Math.min(val, max));
 
 
 let dataset;
 //Dataset source
 let gdpUrl = 'https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/GDP-data.json';
-
 
 
 //Fetch data and generate marks
@@ -72,14 +68,7 @@ d3.json(gdpUrl).then(function(root) {
   console.log(`object fetched by d3.json:`)
   console.log(root);
 
-  dataset = root.data.map((d) => {
-    //parse date string from dataset into js Date
-    let dateProper = new Date(d[0]);
-    let quarterString = quarterFormat(dateProper);
-    //convert GDP value (in billions in the dataset) to full value
-    let fullDollars = d[1] * 1e9;
-    return [dateProper, fullDollars, quarterString];
-  });
+  dataset = root.data.map(datasetParse);
   console.log(`dataset after processing:`); 
   console.log(dataset);
 
@@ -89,12 +78,12 @@ d3.json(gdpUrl).then(function(root) {
   let yMax = d3.max(dataset, (d) => d[1]);
   let yMin = d3.min(dataset, d => d[1]);
 
-  // color scale for y axis (sequential scale of Reds)
+  // barColor separated into 1) scaling y value into val between 0 and 1; and
   // let scaleForColors = d3.scaleSequential()
   //   .domain([0, yMax])
   //   .range([0, 1])
   //   ;
-
+  // 2) applying color interpolation effect
   // let colorMaker = (valueScaledForColors) => 
   //   d3.interpolateReds(scaleColors(valueScaledForColors))
 
@@ -176,42 +165,34 @@ innerGroup.append("g")
 
   let tooltip = d3.select("main")
     .append("div")
-    .style("opacity", 0)
+    .style("opacity", 1)
     .style("z-index", 20)
-    .style("background", `hsla(220, 40%, 20%, 1)`)
+    .style("background", `hsla(220, 40%, 20%, 0.9)`)
     .style("border-width", "1px")
     .style("border-radius", "2px")
-    .style("padding", "15px")
+    .style("padding", "0px 5px")
     .style("position", "absolute")
+    .style("font-size", "1rem")
+    .style("text-align", "center")
     .attr("id", "tooltip")
-    // .attr("height", "500px")
-    // .attr("width", "500px")
-    // .text("unmodified tooltip");
+    ;
 
     let handleMouseOver = function(event, d) {
       d3.select(event.currentTarget)
-        .attr("opacity", 0.85);
-
+        .attr("opacity", 0.5);
       d3.select('#tooltip')
+        .attr("data-date", d[4])
+        .html(`<p>${d[2]}</p><p>${d[3]} Billion</p>`)
+        // .style("top", `${event.pageY}px`)
+        .style("top", `${clamp(0, event.pageY, 1000)}px`)
+        .style("left", `${clamp(0, event.pageX, 1000)}px`)
+
+        // .style("top", `${200}px`)
         .transition()
         .duration('50')
         .style("opacity", 1)
-        .insert("p")
-        .text("here's p for ya")
-        // .text(`This will be the html.
-        //         The time is: ${d[2]}. <br />
-        //         The GDP is: ${d[1]}`)
-        // .text("now  you see me")
-        // .html(function(d){
-        //   return `<p>${d[1]}Inner text ${d[2]}</p>`
-        // })
-        // .html('data of any sort<br></br><br />')
+    ;
     }
-
-    // let handleMouseMove = function(event, d) {       
-    //     // .style("top", `${d3.pointer(event)[1]}px`)
-    //     // .style("left", `${d3.pointer(event)[0]}px`)
-    // }
 
     let handleMouseOut = function(event, d) {
       d3.select(event.currentTarget)
@@ -220,39 +201,31 @@ innerGroup.append("g")
       tooltip
         .transition()
         .duration(200)
-        .style("opacity", 0.5)
+        .style("opacity", 0)
     }
 
   // Blood for the blood god, bars for the Bar Chart
+    let barWidth = innerWidth / dataset.length; 
+
   innerGroup
     .selectAll("rect")
     .data(dataset)
     .enter()
     .append("rect")
-    .attr("margin", 1)
-    .attr("width", 3)
+    // .attr("margin", 1)
+    .attr("width", barWidth)
     .attr("height", (d) => (yScale(0) - yScale(d[1])))
     .attr("fill", d => barColor(d[1]))
     .attr("class", "bar")
-    .property("data-date", d => d[0] )
-    .property("data-gdp", d => d[1])
+    .attr("data-date", d => d[4] )
+    .attr("data-gdp", d => d[5])
     .text( (d) => `${d[0]}, ${d[1]}`)
     .attr("x", (d) => xScale(d[0]))
     .attr("y",(d) => yScale(d[1]))
-    .on("mouseover", function(event, d) {
-      d3.select(event.currentTarget)
-        .attr("opacity", 0.75);
-      d3.select('#tooltip')
-        .transition()
-        .duration('50')
-        .style("opacity", 1)
-        // .html('<div><p>candy capers</p></div>')
-        // .insert("p")
-        .text("here's p for ya")
-
-    })
+    .on("mouseover mousemove focus pointerover", handleMouseOver
+    )
     // .on("mousemove", handleMouseMove)
-    .on("mouseout", handleMouseOut)
+    .on("mouseout pointerleave pointerout", handleMouseOut)
     ;
 
     
