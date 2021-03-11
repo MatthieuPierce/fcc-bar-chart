@@ -2,11 +2,18 @@
 @use 'hero';
 @use 'index.css';
 
-// #svg-div {
-//   width: 100%;
-// }
+#svg-container {
+  display: inline-block;
+  position: relative;
+  width: 100%;
+  padding-bottom: 100%;
+  vertical-align: top;
+  overflow: hidden;
+}
 
 #main-svg {
-  width: 100vw;
-  height: 50vh;
+  display: inline-block;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
