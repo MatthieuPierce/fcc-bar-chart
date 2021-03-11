@@ -30,7 +30,10 @@ module.exports = {
       {
         //rules for javascript files
         test: /\.js$/,
-        exclude: /node_modules/,
+        exclude: [
+          /node_modules/,
+          /fcc-bundle\.js/
+        ],
         use: {
           //without additional settings, babel-loader will reference 
           // .babelrc ; babel.config.js is common alternative

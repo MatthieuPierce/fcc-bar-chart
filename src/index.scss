@@ -1,2 +1,12 @@
 @use 'global';
 @use 'hero';
+@use 'index.css';
+
+// #svg-div {
+//   width: 100%;
+// }
+
+#main-svg {
+  width: 100vw;
+  height: 50vh;
+}
