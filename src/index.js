@@ -203,7 +203,8 @@ json(gdpUrl).then((root) => {
 
     // Style the moused-over bar rect
     select(event.currentTarget)
-      .attr("opacity", 0.5);
+      // .attr("opacity", 0.5)
+      .attr("fill", `hsla(220, 40%, 20%, 0.9)`)
 
     // Update content inside tooltip
     select('#tooltip')
@@ -240,6 +241,7 @@ json(gdpUrl).then((root) => {
   let handleMouseOut = function(event, d) {
     select(event.currentTarget)
       .attr("opacity", "1")
+      .attr("fill", d => barColor(d.gdpClassic))
 
     tooltip
       .transition()

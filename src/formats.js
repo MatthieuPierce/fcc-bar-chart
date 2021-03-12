@@ -1,7 +1,7 @@
 import { timeFormat, format, } from 'd3';
 
 // Date formater for display in tooltip per test criteria
-//I.e. "YYYY QX", 2020 Q4
+// I.e. "YYYY QX", 2020 Q4
 export const quarterFormat = timeFormat("%Y Q%q");
 
 // Y-axis tick text format logic
