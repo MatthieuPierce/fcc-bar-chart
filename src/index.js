@@ -1,26 +1,41 @@
-import * as d3 from 'd3';
-import { select, scaleTime, scaleLinear, selectAll } from 'd3';
-
+import { select, 
+  scaleTime, 
+  scaleLinear, 
+  scaleSequential, 
+  json, 
+  min, 
+  max,
+  interpolateReds,
+  axisBottom,
+  axisLeft,
+ } from 'd3';
 import './index.scss';
-import { yTickText, } from './formats'
 import { datasetParse } from './datasetParse';
+// import { yTickText, } from './formats'  //Removed due to fcc test constraints
 
-//function to create main chart div with plain JS (not D3)
-// no good reason for this, just practice making html in plain js
+
+// Function to create div to contain chart svg with plain JS
+// No good reason for this, just practice making html in plain js
 function makeDivForChart(){
   const element = document.createElement('div');
   element.setAttribute("id", "svg-container");
-
   return element;
 }
-//append chart-div to the "main" element
+// Append .svg-container div to the "main" element
 document.getElementById("main").appendChild(makeDivForChart());
 
+// Snarky disclaimer, required by internal moral compass
+const aside = document.createElement('aside');
+const disclaimer = document.createTextNode(
+`Not included in chart: environmental externalities, global
+sociopolitical conditions, quality of life, income equality, existential
+satisfaction.`
+);
+aside.appendChild( disclaimer);
+document.getElementById("main").appendChild(aside);
 
-//INITIAL CHART PARAMETERS
-//padding
+// Initial chart parameters
 let padding = 30;
-//margin
 let margin = { 
   top: padding, 
   right: padding, 
@@ -28,68 +43,66 @@ let margin = {
   left: padding + 10
 };
 
-//initialize main chart SVG
-let mainSvg = d3.select("#svg-container")
+// Initialize main chart SVG
+let mainSvg = select("#svg-container")
   .append("svg")
   .style("background", `hsla(0,0%, 70%, 0.1)`)
   .style("color", "var(--main-text-color)")
   .attr("id", "main-svg")
 ;
 
-
-//width & height
-const width = 600;
-const height = 300;
+// Width & height
+const width = 500;
+const height = 250;
 let innerWidth = width - margin.left - margin.right;
 let innerHeight = height - margin.top - margin.bottom; 
 
-//apply height and width to mainSvg (separated from initialization because
-// selecting the mainSvg svg element's style: width and height properties
-// requires that the element exist on the DOM first) via viewBox
-
+// Apply height and width to mainSvg via viewBox
 mainSvg
-  // .attr("width", width)
-  // .attr("height", height)
   .attr("preserveAspectRatio", "xMinYMin meet")
   .attr("viewBox", `0 0 ${width} ${height}`)
   .classed("svg-content", true)
 
-//Margin Convention - group all in-chart components, translate over and down
-// to create margins
+// Margin Convention: group all in-chart components, translate over and down
 const innerGroup = mainSvg.append("g")
   .attr("transform", `translate(${margin.left}, ${margin.top})`)
-  // .attr("preserveAspectRatio", "xMinYMin meet")
-  // .attr("viewBox", `0 0 ${innerWidth} ${innerHeight}`)
   .attr("id", "inner-group")
   ;
 
-// HELPER FUNCTIONS
-
-// simple clamp function
+// Helper Function: simple clamp (for use in bounding tooltip position )
 let clamp = (min, val, max) => Math.max(min, Math.min(val, max));
 
-
+// Initialize dataset variable
 let dataset;
+
 //Dataset source
 let gdpUrl = 'https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/GDP-data.json';
 
 
-//Fetch data and generate marks
-d3.json(gdpUrl).then(function(root) {
-
-  console.log(`object fetched by d3.json:`)
-  console.log(root);
-
+//Fetch data and generate marks 
+json(gdpUrl).then((root) => {
   dataset = root.data.map(datasetParse);
-  console.log(`dataset after processing:`); 
-  console.log(dataset);
 
-  //min and max values from dataset, to be reused
-  let xMax = d3.max(dataset, (d) => d[0]);
-  let xMin = d3.min(dataset, d => d[0]);
-  let yMax = d3.max(dataset, (d) => d[1]);
-  let yMin = d3.min(dataset, d => d[1]);
+  // Extract min and max values from dataset, to be reused
+  let xMax = max(dataset, (d) => d.dateProper);
+  let xMin = min(dataset, d => d.dateProper);
+  let yMax = max(dataset, (d) => d.gdpClassic);
 
+  // Set coloration based on y-axis values 
+  let barColor = (d) => {
+    // Given a number in the range [0,1], interpolateReds returns the 
+    // corresponding color in the "Reds" sequential color scheme represented 
+    // as an RGB string.
+    return interpolateReds(
+      // Produces the number in the range [0, 1] by using the scaleSequential
+      // method within the domain of the bar value, and ferrying the data point
+      // to scaleSequential
+      scaleSequential()
+        .domain([0, yMax])
+        .range([0, 1])
+        (d));
+  }
+  // More modular mark coloration option for future reference:
   // barColor separated into 1) scaling y value into val between 0 and 1; and
   // let scaleForColors = d3.scaleSequential()
   //   .domain([0, yMax])
@@ -99,85 +112,79 @@ d3.json(gdpUrl).then(function(root) {
   // let colorMaker = (valueScaledForColors) => 
   //   d3.interpolateReds(scaleColors(valueScaledForColors))
 
-  let barColor = (d) => {
-    // Given a number in the range [0,1], interpolateReds returns the 
-    // corresponding color in the "Reds" sequential color scheme represented 
-    //as an RGB string.
-    return d3.interpolateReds(
-      //produce the number in the range [0, 1] by using the scaleSequential
-      //method within the domain of the bar value, and ferrying the data point
-      // to scaleSequential
-      d3.scaleSequential()
-        .domain([0, yMax])
-        .range([0, 1])
-        (d));
-  }
-
-  let xScale = d3.scaleTime()
+  // Set X and Y scales 
+  let xScale = scaleTime()
     .domain([xMin, xMax])
     .range([0, innerWidth])
-    // .nice() // common practice, skip here for test
+    // .nice() // common practice, skipped here for sake of fcc-test
     ;
-
-  let yScale = d3.scaleLinear()
+  let yScale = scaleLinear()
     .domain([0, yMax])
     .range([innerHeight, 0]);
 
+  // Initialize and append xAxis 
+  let xAxis = axisBottom(xScale);
+  innerGroup.append("g")
+    .attr("transform", `translate(0, ${innerHeight})`)
+    .attr("id", "x-axis")
+    .call(xAxis)
+    .call(g => g.select(".domain")
+      .style("color", "var(--main-text-color)")
+      .attr("stroke-opacity", 0.3))
+    ;
 
-// initialize and append xAxis 
-let xAxis = d3.axisBottom(xScale);
-innerGroup.append("g")
-  .attr("transform", `translate(0, ${innerHeight})`)
-  .attr("id", "x-axis")
-  .call(xAxis)
-  .call(g => g.select(".domain")
-    .style("color", "var(--main-text-color)")
-    .attr("stroke-opacity", 0.3))
-  ;
-
-// initialize and append yAxis
-const yAxis = d3.axisLeft(yScale);
-innerGroup.append("g")
-  .attr("transform", `translate(${0}, 0)`)
-  .style("color", "var(--main-text-color)")
-  // .style("font-size", "0.9rem")
-  .attr("id", "y-axis")
-  .call(yAxis)
-  //move all but the first tick text to the right of the axis and above the line
-  .call(g => g.selectAll(".tick:not(:first-of-type) text")
-    .attr("x", 2)
-    .attr("dy", -3)
-    .attr("text-anchor", "start")
-  )
-  //remove the first tick text ($0), because it overlaps with mark rects 
-  //with this style
-  .call(g => g.select(`.tick:nth-of-type(1) text`)
-    .remove())
-  //format tick text to local (US) currency with two significant digits
-  .call(g => g.selectAll(`.tick text`)
-    .text(t => yTickText(t))
-  )
-  //remove the y axis domain path for style
-  .call(g => g.select(".domain")
-        .remove())
-  // draw tick line across whole chart
-  .call(g => g.selectAll(".tick line")
+  // Initialize and append yAxis
+  const yAxis = axisLeft(yScale);
+  innerGroup.append("g")
     .attr("transform", `translate(${0}, 0)`)
-    .attr(`x1`, 0)
-    .attr(`x2`, innerWidth)
-    .attr("z-index", "-1")
-    .attr("stroke-opacity", 0.3)
-  )
-  .append("text")
-  .text("Gross Domestic Product")
-  .style("fill", "var(--main-text-color)")
-  .attr("transform", `translate(${-10}, ${innerHeight / 2}) rotate(270)`)
-  .attr("text-anchor", "middle")
-  .style("font-size", "1.5em")
-  .attr("id", "y-label")
-  ;
+    .style("color", "var(--main-text-color)")
+    .attr("id", "y-axis")
+    .call(yAxis)
+    // Move all but the first tick text to the right of axis and above line
+    .call(g => g.selectAll(".tick:not(:first-of-type) text")
+      .attr("x", 2)
+      .attr("dy", -3)
+      .attr("text-anchor", "start")
+    )
+    // Remove the first tick text ($0), because it overlaps with mark rects 
+    // in this particular "stacked values inside main chart body" style
+    .call(g => g.select(`.tick:nth-of-type(1) text`)
+      // commenting out preferred method (remove) due to fcc test constraints
+      // .remove()
+      // instead hiding the text with transparency like a coward
+      .style("color", "transparent")
+      )
+    // Format tick text to local (US) currency with two significant digits
+    .call(g => g.selectAll(`.tick text`)
+      // commenting this out this due to fcc test constraints
+      // .text(t => yTickText(t))
+      // replace with default behavior
+      .text (t => t)
 
-  let tooltip = d3.select("#svg-container")
+    )
+    // Remove the y axis domain path for style
+    .call(g => g.select(".domain")
+          .remove())
+    // Draw tick lines across whole chart
+    .call(g => g.selectAll(".tick line")
+      .attr("transform", `translate(${0}, 0)`)
+      .attr(`x1`, 0)
+      .attr(`x2`, innerWidth)
+    // Move tick lines below bar marks
+      .attr("z-index", "-1")
+      .attr("stroke-opacity", 0.3)
+    )
+    .append("text")
+    .text("Gross Domestic Product - Billion$")
+    .style("fill", "var(--main-text-color)")
+    .attr("transform", `translate(${-10}, ${innerHeight / 2}) rotate(270)`)
+    .attr("text-anchor", "middle")
+    .style("font-size", "1.3em")
+    .attr("id", "y-label")
+    ;
+    
+  // Create tooltip
+  let tooltip = select("#svg-container")
     .append("div")
     .style("opacity", 1)
     .style("z-index", 20)
@@ -191,90 +198,78 @@ innerGroup.append("g")
     .attr("id", "tooltip")
     ;
 
-    let handleMouseOver = function(event, d) {
-      d3.select(event.currentTarget)
-        .attr("opacity", 0.5);
-      d3.select('#tooltip')
-        .attr("data-date", d[4])
-        .html(`<p>${d[2]}</p><p>${d[3]} Billion</p>`);
-      
-      //get size and position information on tooltip element and the overall
-      // chart in order to clamp with tooltip within its bounds
-      // let tipWidth = 
-      let tipDimensions =  document.querySelector("#tooltip")
-        .getBoundingClientRect();
-      let chartDimentions = document.querySelector("#main-svg")
-        .getBoundingClientRect();
-      
-      console.log(`x, yOffset: ${event.offsetX}, ${event.offsetY}`);
+  // Function to handling mouse over mark (bar rect) elements
+  let handleMouseOver = function(event, d) {
 
-      d3.select('#tooltip')
-        .style("top", 
-          `${clamp(
-              0, 
-              event.offsetY - tipDimensions.height - 5,
-              chartDimentions.height - tipDimensions.height
-              )}px`)
-        .style("left",
-          `${clamp(
-            margin.left, 
-            event.offsetX - tipDimensions.width - 5, 
-            chartDimentions.width - tipDimensions.width
+    // Style the moused-over bar rect
+    select(event.currentTarget)
+      .attr("opacity", 0.5);
+
+    // Update content inside tooltip
+    select('#tooltip')
+      .attr("data-date", d.dateClassic)
+      .html(`<p>${d.quarterString}</p><p>${d.gdpString} Billion</p>`);
+    
+    // Get size and position information on tooltip element and the overall
+    // chart in order to clamp the tooltip position within it chart bounds
+    let tipDimensions =  document.querySelector("#tooltip")
+      .getBoundingClientRect();
+    let chartDimentions = document.querySelector("#main-svg")
+      .getBoundingClientRect();
+
+    // Position the tooltip element -- clamp takes (min, val, max)
+    select('#tooltip')
+      .style("top", 
+        `${clamp(
+            0, 
+            event.offsetY - tipDimensions.height - 5,
+            chartDimentions.height - tipDimensions.height
             )}px`)
-        .transition()
-        .duration('50')
-        .style("opacity", 1)
-    ;
-    }
+      .style("left",
+        `${clamp(
+          margin.left, 
+          event.offsetX - tipDimensions.width - 5, 
+          chartDimentions.width - tipDimensions.width
+          )}px`)
+      .transition()
+      .duration('50')
+      .style("opacity", 1)
+  ;
+  }
+  // Function to handle mouse leaving bar, simple transition to 0 opacity
+  let handleMouseOut = function(event, d) {
+    select(event.currentTarget)
+      .attr("opacity", "1")
 
-    let handleMouseOut = function(event, d) {
-      d3.select(event.currentTarget)
-        .attr("opacity", "1")
+    tooltip
+      .transition()
+      .duration(200)
+      .style("opacity", 0)
+  }
 
-      tooltip
-        .transition()
-        .duration(200)
-        .style("opacity", 0)
-    }
-
+  // Create marks 
   // Blood for the blood god, bars for the Bar Chart
-    let barWidth = innerWidth / dataset.length + 1; 
+  
+  // Set bar width according to available size, add a teense to remove gaps
+  let barWidth = innerWidth / dataset.length + 1; 
 
   innerGroup
     .selectAll("rect")
     .data(dataset)
     .enter()
     .append("rect")
-    // .attr("margin", 1)
     .attr("width", barWidth)
-    .attr("height", (d) => (yScale(0) - yScale(d[1])))
-    .attr("fill", d => barColor(d[1]))
+    .attr("height", (d) => ((yScale(0) - yScale(d.gdpClassic)) * 1000 ) / 1000 )
+    .attr("fill", d => barColor(d.gdpClassic))
     .attr("class", "bar")
-    .attr("data-date", d => d[4] )
-    .attr("data-gdp", d => d[5])
-    .text( (d) => `${d[0]}, ${d[1]}`)
-    .attr("x", (d) => xScale(d[0]))
-    .attr("y",(d) => yScale(d[1]))
+    .attr("data-date", d => d.dateClassic )
+    .attr("data-gdp", d => d.gdpClassic)
+    .attr("x", (d) => xScale(d.dateProper))
+    .attr("y",(d) => (yScale(d.gdpClassic) * 1000 ) / 1000)
     .on("mouseover mousemove focus pointerover", handleMouseOver
     )
     // .on("mousemove", handleMouseMove)
     .on("mouseout pointerleave pointerout", handleMouseOut)
     ;
-
-    
-
-  // innerGroup
-  // .append("circle")
-  // .attr("cx", 30)
-  // .attr("cy", 30)
-  // .attr("r", 50)
-  // .attr("fill", "red");
-
-  
-
-
   }
-
- 
-    
 );
