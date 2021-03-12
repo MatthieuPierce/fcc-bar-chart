@@ -1,5 +1,5 @@
 # fcc-bar-chart
-[A responsive d3 bar chart showing U.S. GDP through 2015](https://github.com/MatthieuPierce/fcc-bar-chart).
+[A responsive d3 bar chart showing U.S. GDP through 2015](https://matthieupierce.github.io/fcc-bar-chart/).
 
 ## Built with features from:
 - d3
